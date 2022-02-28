@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net"
+	"os"
+	"strings"
 )
 
 type xmlIpc struct {
@@ -53,7 +55,7 @@ type xmlIpc struct {
 
 func main() {
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.IPv4(0, 0, 0, 0),
+		IP:   net.ParseIP(ipAddr()),
 		Port: 37020,
 	})
 	if err != nil {
@@ -81,7 +83,35 @@ func main() {
 		if err != nil {
 			fmt.Println("xml转换结构体异常：", err.Error())
 		} else {
-			fmt.Println(ipc.Uuid, ipc.IPv4Address)
+			fmt.Println(ipc.DeviceSN, ipc.IPv4Address)
 		}
 	}
+}
+
+// 自动获取IP地址
+func ipAddr() string {
+	//var ipAddr
+	var ipAddr string
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		fmt.Println("获取本地网卡失败: ", err)
+		os.Exit(-1)
+	}
+	for _, inter := range interfaces {
+		flags := inter.Flags.String()
+		if strings.Contains(flags, "up") && strings.Contains(flags, "broadcast") {
+			addrs, err := inter.Addrs()
+			if err != nil {
+				print("you")
+			}
+			for i := 0; i < len(addrs); i++ {
+				addr := addrs[i].String()
+				ip := addr[len(addr)-2:]
+				if ip == "24" {
+					ipAddr = addr[:len(addr)-3]
+				}
+			}
+		}
+	}
+	return ipAddr
 }
