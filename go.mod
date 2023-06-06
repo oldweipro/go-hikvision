@@ -1,4 +1,4 @@
-module github.com/oldweipro/go-hikvision-scan
+module github.com/oldweipro/go-hikvision
 
 go 1.20
 

@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/oldweipro/go-hikvision-scan/model"
+	"github.com/oldweipro/go-hikvision/model"
 	"net"
 	"os"
 	"strings"
