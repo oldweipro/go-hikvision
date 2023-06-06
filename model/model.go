@@ -1,14 +1,16 @@
-package main
+package model
 
 import (
 	"encoding/xml"
-	"fmt"
-	"net"
-	"os"
-	"strings"
+	"sync"
 )
 
-type xmlIpc struct {
+type Probe struct {
+	Uuid  string `xml:"Uuid"`
+	Types string `xml:"Types"`
+}
+
+type Device struct {
 	XMLName                 xml.Name `xml:"ProbeMatch"`
 	Uuid                    string   `xml:"Uuid"`
 	Types                   string   `xml:"Types"`
@@ -46,72 +48,16 @@ type xmlIpc struct {
 	SupportIPv6             string   `xml:"supportIPv6"`
 	SupportModifyIPv6       string   `xml:"supportModifyIPv6"`
 	SupportHCPlatform       bool     `xml:"SupportHCPlatform"`
-	//xml转换结构体异常： strconv.ParseBool: parsing "flase": invalid syntax 设备报文"flase"无法转换bool导致报错，无奈只能改为string
+	//xml转换结构体异常: `strconv.ParseBool: parsing "flase": invalid syntax`
+	//设备报文"flase"无法转换bool导致报错,无奈只能改为string,这真是海康的一个低级错误
 	HCPlatformEnable         string `xml:"HCPlatformEnable"`
 	IsModifyVerificationCode bool   `xml:"IsModifyVerificationCode"`
 	SupportMailBox           bool   `xml:"SupportMailBox"`
 	SupportEzvizUnbind       string `xml:"supportEzvizUnbind"`
 }
 
-func main() {
-	listen, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP(ipAddr()),
-		Port: 37020,
-	})
-	if err != nil {
-		fmt.Println("监听端口失败, err:", err)
-		return
-	}
-	defer func(listen *net.UDPConn) {
-		err := listen.Close()
-		if err != nil {
-			fmt.Println("err:", err)
-		}
-	}(listen)
-	fmt.Println("服务启动完成!")
-	for {
-		var data [2048]byte
-		n, _, err := listen.ReadFromUDP(data[:]) // 接收数据
-		if err != nil {
-			fmt.Println("读取udp数据失败, err:", err)
-			continue
-		}
-		xmlData := data[:n]
-		//fmt.Println("xml数据:", string(xmlData))
-		var ipc xmlIpc
-		err = xml.Unmarshal(xmlData, &ipc)
-		if err != nil {
-			fmt.Println("xml转换结构体异常：", err.Error())
-		} else {
-			fmt.Println(ipc.DeviceSN, ipc.IPv4Address)
-		}
-	}
-}
-
-// 自动获取IP地址
-func ipAddr() string {
-	//var ipAddr
-	var ipAddr string
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		fmt.Println("获取本地网卡失败: ", err)
-		os.Exit(-1)
-	}
-	for _, inter := range interfaces {
-		flags := inter.Flags.String()
-		if strings.Contains(flags, "up") && strings.Contains(flags, "broadcast") {
-			addrs, err := inter.Addrs()
-			if err != nil {
-				print("you")
-			}
-			for i := 0; i < len(addrs); i++ {
-				addr := addrs[i].String()
-				ip := addr[len(addr)-2:]
-				if ip == "24" {
-					ipAddr = addr[:len(addr)-3]
-				}
-			}
-		}
-	}
-	return ipAddr
+type DeviceList struct {
+	// 使用 sync.Mutex 进行加锁，避免多个 goroutine 并发写入 deviceList
+	sync.Mutex
+	Devices []Device
 }

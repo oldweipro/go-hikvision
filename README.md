@@ -1,20 +1,40 @@
-# Go-SADPTool
+# go-hikvision
 go语言写的类似SADPTool工具，搜索海康设备。
 
-### 注意事项
+## 运行
 
-⚠️⚠️⚠️如果存在多网卡，服务端可能作用在网络不可用的网卡上，有时间会增加网卡选择
+```bash
+go run main.go
+```
 
-### 1.首先启动server，监听端口37020
+## 原理
 
-接收设备发送到本机的udp请求
+项目运行后会监听端口`37020`，本机会向局域网中广播`探测数据`
 
-### 2.启动client，发送udp组播
+```go
+uuidString := strings.ToUpper(uuid.NewString())
+req := model.Probe{
+    Uuid:  uuidString,
+    Types: "inquiry",
+}
+sendBytes, err := xml.Marshal(req)
+```
 
-设备会向发起的udp组播的IP地址（也就是本机）发送设备信息，由最先启动的服务端server去接收设备发出udp请求。
+接收到探测数据的设备会向发起的udp组播的IP地址（也就是本机）发送设备信息。
 
-### 3.本项目代码是根据海康SADPTool设备网络工具，通过wireshark抓包分析而来。
+```go
+n, _, err := conn.ReadFromUDP(data)
+if err != nil {
+    panic(err)
+}
+var ipc model.Device
+err = xml.Unmarshal(data[:n], &ipc)
+```
 
-如果本项目对您有帮助，请点个star，感谢大家🙇‍🙇‍🙇‍！
+## 起源
+
+本项目代码是根据海康SADPTool设备网络搜索工具，通过wireshark抓包分析而来。
+
+PS：主要还是作者的电脑是Mac，运行不起来《SADPTool设备网络搜索工具》
 
 ![udp抓包截图](images/udp_capture_screenshot.png)

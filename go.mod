@@ -1,8 +1,5 @@
-module Go-SADPTool
+module github.com/oldweipro/go-hikvision-scan
 
-go 1.16
+go 1.20
 
-require (
-	github.com/satori/go.uuid v1.2.0
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-)
+require github.com/google/uuid v1.3.0
