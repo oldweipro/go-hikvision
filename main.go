@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/oldweipro/go-hikvision/model"
+	"golang.org/x/net/ipv4"
 	"net"
 	"os"
 	"strings"
@@ -14,21 +16,70 @@ import (
 
 const OUTPUT = "device.json"
 
+// newListenConn 创建 UDP 监听连接。
+// ifaceName 不为空时监听该网卡的 IPv4 地址，并强制组播探测从该网卡发出；
+// 为空时监听所有网卡（默认行为）。
+func newListenConn(ifaceName string) (*net.UDPConn, error) {
+	if ifaceName == "" {
+		listenAddr, err := net.ResolveUDPAddr("udp4", ":37020")
+		if err != nil {
+			return nil, err
+		}
+		return net.ListenUDP("udp4", listenAddr)
+	}
+
+	ifi, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	var ifaceIP net.IP
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range addrs {
+		ip, _, e := net.ParseCIDR(a.String())
+		if e == nil && ip.To4() != nil {
+			ifaceIP = ip
+			break
+		}
+	}
+	if ifaceIP == nil {
+		return nil, fmt.Errorf("网卡 %s 没有 IPv4 地址", ifaceName)
+	}
+
+	//只绑定该网卡，只接收发往该网卡 IP 的回复
+	listenAddr, err := net.ResolveUDPAddr("udp4", net.JoinHostPort(ifaceIP.String(), "37020"))
+	if err != nil {
+		return nil, err
+	}
+	conn, err := net.ListenUDP("udp4", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	//强制组播探测从指定网卡发出，而不是系统默认路由的网卡
+	pc := ipv4.NewPacketConn(conn)
+	if err := pc.SetMulticastInterface(ifi); err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
 func main() {
+	//命令行参数指定搜索使用的网卡，例如 -i eth3；不指定则使用所有网卡
+	ifaceName := flag.String("i", "", "指定搜索使用的网卡名称，例如 eth3")
+	flag.Parse()
+
 	//准备广播地址
 	addr, err := net.ResolveUDPAddr("udp4", "239.255.255.250:37020")
 	if err != nil {
 		panic(err)
 	}
 
-	//准备监听地址
-	listenAddr, err := net.ResolveUDPAddr("udp4", ":37020")
-	if err != nil {
-		panic(err)
-	}
-
 	//创建连接
-	conn, err := net.ListenUDP("udp4", listenAddr)
+	conn, err := newListenConn(*ifaceName)
 	if err != nil {
 		panic(err)
 	}
